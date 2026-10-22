@@ -1,0 +1,7 @@
+.git
+.out
+out
+*.md
+deploy
+compose.yaml
+Makefile

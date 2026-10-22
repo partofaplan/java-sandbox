@@ -1,0 +1,35 @@
+# Three replicas of the same ~20 MB image, each capped at 64 MiB by the container, not by -Xmx.
+# Hit http://localhost:8080, :8081, :8082 and watch the footer / X-Served-By change.
+#
+#   docker compose up --build
+#   docker compose kill -s SIGTERM site   # watch readiness go 503, drain, exit, restart
+services:
+  site:
+    build:
+      context: .
+      args:
+        BASE: ${BASE:-java-native-base}
+        JAVA: ${JAVA:-21}
+    image: portfolio:local
+    ports:
+      - "8080-8082:8080"
+    environment:
+      DRAIN_SECONDS: "5"
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 64M      # the one and only memory setting
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 15s    # > DRAIN_SECONDS + 2s so the drain is never cut short
+    healthcheck:
+      test: ["CMD", "/app", "healthcheck"]
+      interval: 10s
+      timeout: 2s
+      start_period: 1s
+      retries: 3

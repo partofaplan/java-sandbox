@@ -1,0 +1,35 @@
+#!/bin/sh
+# build-native MAIN_CLASS OUTPUT_PATH [extra native-image flags...]
+#
+# The compile policy of the base image, so application Dockerfiles stay tiny.
+# Input:  Java sources under $SRC (default /work/src). No Maven, no Gradle, no pom.
+# Output: one fully static Linux executable at OUTPUT_PATH that runs on `scratch`.
+set -eu
+MAIN="$1"; OUT="$2"; shift 2
+SRC="${SRC:-/work/src}"
+CLASSES="${CLASSES:-/work/classes}"
+mkdir -p "$CLASSES" "$(dirname "$OUT")"
+
+find "$SRC" -name '*.java' > "$CLASSES/.sources"
+javac -Xlint:all -Werror --release 21 -d "$CLASSES" @"$CLASSES/.sources"
+
+# --static --libc=musl        : zero shared-library dependencies -> runs on scratch/distroless-static
+# --no-fallback               : refuse to silently produce a JVM-backed launcher
+# --install-exit-handlers     : SIGTERM/SIGINT run shutdown hooks (graceful drain) instead of a hard kill
+# -march=compatibility        : baseline x86-64 so the image runs on any node in the cluster
+# -R:MaximumHeapSizePercent   : the ONLY memory policy, expressed as a share of the container limit
+native-image \
+  --static --libc=musl \
+  --no-fallback \
+  --install-exit-handlers \
+  -march=compatibility \
+  --gc=serial \
+  -R:MaximumHeapSizePercent=80 \
+  -H:+ReportExceptionStackTraces \
+  -cp "$CLASSES" \
+  -o "$OUT" \
+  "$@" \
+  "$MAIN"
+
+strip --strip-unneeded "$OUT" 2>/dev/null || true
+ls -la "$OUT"
