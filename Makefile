@@ -11,6 +11,8 @@
 JAVA   ?= 21
 BASE   ?= java-native-base
 IMAGE  ?= portfolio:local
+# The GraalVM muslib toolchain only exists for amd64; pin every build so the binary and runtime agree.
+PLATFORM ?= linux/amd64
 MAIN    = portfolio.Main
 SOURCES = $(shell find src -name '*.java')
 
@@ -26,14 +28,14 @@ native: $(SOURCES)
 	@SRC=$(CURDIR)/src CLASSES=$(CURDIR)/.out base/build-native $(MAIN) $(CURDIR)/out/app
 
 base:
-	docker build --target toolchain --build-arg JAVA=$(JAVA) -t $(BASE):$(JAVA)-toolchain base/
-	docker build --target runtime   --build-arg JAVA=$(JAVA) -t $(BASE):$(JAVA)-runtime   base/
+	docker build --platform $(PLATFORM) --target toolchain --build-arg JAVA=$(JAVA) -t $(BASE):$(JAVA)-toolchain base/
+	docker build --platform $(PLATFORM) --target runtime   --build-arg JAVA=$(JAVA) -t $(BASE):$(JAVA)-runtime   base/
 
 image:
-	docker build --build-arg BASE=$(BASE) --build-arg JAVA=$(JAVA) -t $(IMAGE) .
+	docker build --platform $(PLATFORM) --build-arg BASE=$(BASE) --build-arg JAVA=$(JAVA) -t $(IMAGE) .
 
 run:
-	docker run --rm -p 8080:8080 --memory=64m --read-only --cap-drop=ALL --security-opt=no-new-privileges $(IMAGE)
+	docker run --rm --platform $(PLATFORM) -p 8080:8080 --memory=64m --read-only --cap-drop=ALL --security-opt=no-new-privileges $(IMAGE)
 
 up:
 	docker compose up --build

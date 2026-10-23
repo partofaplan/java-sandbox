@@ -16,9 +16,13 @@ ARG JAVA=21
 # ---------------------------------------------------------------------------
 # toolchain
 # ---------------------------------------------------------------------------
+# The muslib toolchain is published for linux/amd64 only, so build with --platform=linux/amd64
+# (the Makefile does). Runs under emulation on arm64 hosts.
 FROM ghcr.io/graalvm/native-image-community:${JAVA}-muslib AS toolchain
 LABEL org.opencontainers.image.title="java-native-base/toolchain" \
       org.opencontainers.image.description="javac + GraalVM native-image + musl; compiles Java to a static Linux binary"
+# findutils for build-native's source scan; binutils for `strip`. Neither ships in the slim image.
+RUN microdnf install -y findutils binutils && microdnf clean all
 COPY build-native /usr/local/bin/build-native
 RUN chmod 0755 /usr/local/bin/build-native
 WORKDIR /work
