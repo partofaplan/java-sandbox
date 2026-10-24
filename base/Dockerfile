@@ -6,21 +6,33 @@
 #   docker build --target runtime   -t java-native-base:21-runtime   base/
 #
 # Two targets, one Dockerfile:
-#   toolchain  GraalVM native-image + musl. Turns .java files into ONE static executable.
+#   toolchain  GraalVM native-image + a static libc (musl on amd64, glibc on arm64).
+#              Turns .java files into ONE static executable.
 #              Used only at build time; it never ships.
 #   runtime    What actually ships. No JVM, no shell, no package manager, no libc.
 #              The application binary is the only thing added on top.
 
 ARG JAVA=21
+# Set by BuildKit from --platform (amd64, arm64). Selects the toolchain flavour below.
+ARG TARGETARCH
 
 # ---------------------------------------------------------------------------
 # toolchain
 # ---------------------------------------------------------------------------
-# The muslib toolchain is published for linux/amd64 only, so build with --platform=linux/amd64
-# (the Makefile does). Runs under emulation on arm64 hosts.
-FROM ghcr.io/graalvm/native-image-community:${JAVA}-muslib AS toolchain
+# amd64: the muslib toolchain (static musl). It is published for linux/amd64 only.
+FROM ghcr.io/graalvm/native-image-community:${JAVA}-muslib AS toolchain-amd64
+ENV NATIVE_LIBC=musl
+# arm64: no muslib image exists, so use the multi-arch one and link glibc statically
+# (libc.a / libz.a / libstdc++.a already ship in it). Caveat: static glibc needs NSS modules
+# (libnss_*.so) for name lookups and distroless/static has none, so getaddrinfo/getLocalHost
+# can fail. This server avoids them: it binds a numeric address and reads $HOSTNAME.
+FROM ghcr.io/graalvm/native-image-community:${JAVA} AS toolchain-arm64
+ENV NATIVE_LIBC=glibc
+
+# BuildKit only builds the stage for the target arch, so amd64-only images are never pulled on arm64.
+FROM toolchain-${TARGETARCH} AS toolchain
 LABEL org.opencontainers.image.title="java-native-base/toolchain" \
-      org.opencontainers.image.description="javac + GraalVM native-image + musl; compiles Java to a static Linux binary"
+      org.opencontainers.image.description="javac + GraalVM native-image + static libc; compiles Java to a static Linux binary"
 # findutils for build-native's source scan; binutils for `strip`. Neither ships in the slim image.
 RUN microdnf install -y findutils binutils && microdnf clean all
 COPY build-native /usr/local/bin/build-native

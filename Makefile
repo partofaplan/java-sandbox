@@ -11,7 +11,8 @@
 JAVA   ?= 21
 BASE   ?= java-native-base
 IMAGE  ?= portfolio:local
-# The GraalVM muslib toolchain only exists for amd64; pin every build so the binary and runtime agree.
+# Pin every build so the binary and runtime agree. amd64 links musl; PLATFORM=linux/arm64 links
+# glibc statically (no muslib toolchain exists for arm64). Both run on distroless/static.
 PLATFORM ?= linux/amd64
 MAIN    = portfolio.Main
 SOURCES = $(shell find src -name '*.java')

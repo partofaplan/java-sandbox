@@ -34,8 +34,8 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: site
-          image: portfolio:local            # replace with your registry path
-          imagePullPolicy: IfNotPresent
+          image: docker.io/partofaplan/portfolio:latest
+          imagePullPolicy: Always
           ports:
             - { name: http, containerPort: 8080 }
           env:

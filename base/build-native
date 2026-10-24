@@ -13,13 +13,14 @@ mkdir -p "$CLASSES" "$(dirname "$OUT")"
 find "$SRC" -name '*.java' > "$CLASSES/.sources"
 javac -Xlint:all -Werror --release 21 -d "$CLASSES" @"$CLASSES/.sources"
 
-# --static --libc=musl        : zero shared-library dependencies -> runs on scratch/distroless-static
+# --static --libc=$NATIVE_LIBC : zero shared-library dependencies -> runs on scratch/distroless-static.
+#                               musl on amd64, glibc on arm64 (set by the toolchain stage; default musl)
 # --no-fallback               : refuse to silently produce a JVM-backed launcher
 # --install-exit-handlers     : SIGTERM/SIGINT run shutdown hooks (graceful drain) instead of a hard kill
-# -march=compatibility        : baseline x86-64 so the image runs on any node in the cluster
+# -march=compatibility        : baseline x86-64 / armv8-a so the image runs on any node in the cluster
 # -R:MaximumHeapSizePercent   : the ONLY memory policy, expressed as a share of the container limit
 native-image \
-  --static --libc=musl \
+  --static --libc="${NATIVE_LIBC:-musl}" \
   --no-fallback \
   --install-exit-handlers \
   -march=compatibility \
